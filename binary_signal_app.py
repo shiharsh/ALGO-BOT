@@ -43,36 +43,22 @@ def fetch_alpha(symbol):
 
 # ─── FETCH FROM TWELVE DATA ─────────────────────────────
 @st.cache_data(ttl=300)
-def fetch_twelve(sym, twelve_key):
+def fetch_twelve(symbol):
+    if is_fx:
+        sym = symbol.replace("/", "")
+    else:
+        sym = symbol_map[symbol]
     url = f"https://api.twelvedata.com/time_series?symbol={sym}&interval=5min&apikey={twelve_key}&outputsize=100"
-    response = requests.get(url)
-    if response.status_code != 200:
-        raise Exception("Failed to fetch from Twelve Data")
-
-    data = response.json()
-    if 'values' not in data:
-        raise Exception("Missing 'values' in Twelve Data response")
-
-    df = pd.DataFrame(data['values'])
-    df = df.rename(columns={
-        'datetime': 'datetime',
-        'open': 'open',
-        'high': 'high',
-        'low': 'low',
-        'close': 'close',
-        'volume': 'volume'
-    })
-    df['datetime'] = pd.to_datetime(df['datetime'])
-    df = df.astype({
-        'open': 'float',
-        'high': 'float',
-        'low': 'float',
-        'close': 'float',
-        'volume': 'float'
-    })
-    df = df.sort_values('datetime')
-    df.set_index("datetime", inplace=True)
-    return df
+    r = requests.get(url)
+    data = r.json()
+    if "values" not in data:
+        return None
+    df = pd.DataFrame(data["values"])
+    df.columns = [c.capitalize() for c in df.columns]
+    df = df.set_index("Datetime")
+    df = df.astype(float)
+    df.index = pd.to_datetime(df.index)
+    return df.sort_index()
 
 # ─── TITLE AND LOAD DATA ────────────────────────────────
 st.title("📈 Binary Trading Signal Bot (5-Min) with Live Data")
@@ -80,7 +66,7 @@ st.title("📈 Binary Trading Signal Bot (5-Min) with Live Data")
 df = fetch_alpha(symbol)
 if df is None:
     st.warning("⚠️ Alpha Vantage failed – switching to Twelve Data...")
-    df = fetch_twelve(symbol, twelve_key)
+    df = fetch_twelve(symbol)
 
 if df is None:
     st.error("❌ Could not fetch data from either Alpha Vantage or Twelve Data.")
