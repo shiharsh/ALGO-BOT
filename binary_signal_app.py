@@ -43,39 +43,36 @@ def fetch_alpha(symbol):
 
 # ─── FETCH FROM TWELVE DATA ─────────────────────────────
 @st.cache_data(ttl=300)
-def fetch_twelve(symbol, twelve_key):
-    sym = symbol  # e.g., "EUR/USD"
+def fetch_twelve(sym, twelve_key):
     url = f"https://api.twelvedata.com/time_series?symbol={sym}&interval=5min&apikey={twelve_key}&outputsize=100"
-    
-    try:
-        response = requests.get(url)
-        data = response.json()
+    response = requests.get(url)
+    if response.status_code != 200:
+        raise Exception("Failed to fetch from Twelve Data")
 
-        # Debug output to inspect the response
-        st.code(data)
+    data = response.json()
+    if 'values' not in data:
+        raise Exception("Missing 'values' in Twelve Data response")
 
-        if "values" in data:
-            df = pd.DataFrame(data["values"])
-            df.rename(columns={
-                "datetime": "datetime",
-                "open": "open",
-                "high": "high",
-                "low": "low",
-                "close": "close",
-                "volume": "volume"
-            }, inplace=True)
-            df["datetime"] = pd.to_datetime(df["datetime"])
-            df = df.sort_values("datetime")
-            df.set_index("datetime", inplace=True)
-            df = df.astype(float)
-            return df
-        else:
-            st.error("❌ Twelve Data API error: " + str(data.get("message", "Unknown error.")))
-            return None
-
-    except Exception as e:
-        st.error(f"❌ Exception while fetching from Twelve Data: {e}")
-        return None
+    df = pd.DataFrame(data['values'])
+    df = df.rename(columns={
+        'datetime': 'datetime',
+        'open': 'open',
+        'high': 'high',
+        'low': 'low',
+        'close': 'close',
+        'volume': 'volume'
+    })
+    df['datetime'] = pd.to_datetime(df['datetime'])
+    df = df.astype({
+        'open': 'float',
+        'high': 'float',
+        'low': 'float',
+        'close': 'float',
+        'volume': 'float'
+    })
+    df = df.sort_values('datetime')
+    df.set_index("datetime", inplace=True)
+    return df
 
 # ─── TITLE AND LOAD DATA ────────────────────────────────
 st.title("📈 Binary Trading Signal Bot (5-Min) with Live Data")
@@ -83,7 +80,7 @@ st.title("📈 Binary Trading Signal Bot (5-Min) with Live Data")
 df = fetch_alpha(symbol)
 if df is None:
     st.warning("⚠️ Alpha Vantage failed – switching to Twelve Data...")
-    df = fetch_twelve(symbol)
+    df = fetch_twelve(symbol, twelve_key)
 
 if df is None:
     st.error("❌ Could not fetch data from either Alpha Vantage or Twelve Data.")
