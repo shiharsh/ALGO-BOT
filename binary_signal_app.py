@@ -2,13 +2,12 @@ import streamlit as st
 import pandas as pd
 import ta
 import requests
-from datetime import datetime
 
-# ─── KEYS ───────────────────────────────────────────────
+# ─── API KEYS ───────────────────────────────────────────
 alpha_key = "P4ISS18L9D90IZH4"
-twelve_key = "4d5b1e81f9314e28a7ee285497d3b273"  # Replace with your Twelve Data key (get free one at https://twelvedata.com)
+twelve_key = "4d5b1e81f9314e28a7ee285497d3b273"
 
-# ─── SYMBOL MAP ─────────────────────────────────────────
+# ─── SYMBOLS ────────────────────────────────────────────
 symbol = st.selectbox("Choose a symbol:", ["EUR/USD", "GBP/USD", "BTC/USD", "ETH/USD", "AAPL", "TSLA"])
 symbol_map = {
     "EUR/USD": ("EUR", "USD"),
@@ -18,7 +17,6 @@ symbol_map = {
     "AAPL": "AAPL",
     "TSLA": "TSLA"
 }
-
 is_fx = isinstance(symbol_map[symbol], tuple)
 
 # ─── FETCH FROM ALPHA VANTAGE ───────────────────────────
@@ -32,7 +30,7 @@ def fetch_alpha(symbol):
         sym = symbol_map[symbol]
         url = f"https://www.alphavantage.co/query?function=TIME_SERIES_INTRADAY&symbol={sym}&interval=5min&apikey={alpha_key}"
         key = "Time Series (5min)"
-
+    
     r = requests.get(url)
     data = r.json()
     if key not in data:
@@ -62,16 +60,16 @@ def fetch_twelve(symbol):
     df.index = pd.to_datetime(df.index)
     return df.sort_index()
 
-# ─── GET DATA WITH FALLBACK ─────────────────────────────
+# ─── TITLE AND LOAD DATA ────────────────────────────────
 st.title("📈 Binary Trading Signal Bot (5-Min) with Live Data")
 
 df = fetch_alpha(symbol)
 if df is None:
-    st.warning("Alpha Vantage failed – switching to Twelve Data...")
+    st.warning("⚠️ Alpha Vantage failed – switching to Twelve Data...")
     df = fetch_twelve(symbol)
 
 if df is None:
-    st.error("❌ Could not fetch data from either source.")
+    st.error("❌ Could not fetch data from either Alpha Vantage or Twelve Data.")
     st.stop()
 
 # ─── INDICATORS ─────────────────────────────────────────
@@ -80,7 +78,7 @@ df["RSI"]  = ta.momentum.rsi(df["Close"], window=14)
 macd = ta.trend.MACD(df["Close"])
 df["MACD"] = macd.macd_diff()
 
-# ─── SIGNALS ────────────────────────────────────────────
+# ─── SIGNAL LOGIC ───────────────────────────────────────
 def generate_signal(r):
     if r["Close"] > r["EMA9"] and r["RSI"] > 50 and r["MACD"] > 0:
         return "CALL"
@@ -91,9 +89,10 @@ def generate_signal(r):
 
 df["Signal"] = df.apply(generate_signal, axis=1)
 
-# ─── DISPLAY ────────────────────────────────────────────
+# ─── DISPLAY SIGNAL ─────────────────────────────────────
 latest = df.iloc[-1]
-st.metric("Signal", latest["Signal"], help="Based on EMA9, RSI, and MACD")
+st.metric("📍 Signal", latest["Signal"], help="Based on EMA9, RSI, and MACD")
 
-with st.expander("🔍 Show recent data"):
+# ─── SHOW RECENT DATA ───────────────────────────────────
+with st.expander("📊 Show recent data"):
     st.dataframe(df.tail(10))
