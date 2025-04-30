@@ -9,7 +9,7 @@ st.title("📈 Binary Trading Signal Bot (5-Min) with Live Data")
 
 # === SETTINGS ===
 symbol = st.selectbox("Choose a symbol:", ["EUR/USD", "GBP/USD", "BTC/USD", "ETH/USD", "AAPL", "TSLA"])
-api_key = "demo"  # Replace with your actual Alpha Vantage API key
+api_key = "P4ISS18L9D90IZH4"  # Replace with your actual Alpha Vantage API key
 
 symbol_map = {
     "EUR/USD": "EURUSD",
