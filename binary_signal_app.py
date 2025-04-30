@@ -43,34 +43,16 @@ def fetch_alpha(symbol):
 
 # ─── FETCH FROM TWELVE DATA ─────────────────────────────
 @st.cache_data(ttl=300)
-def fetch_twelve(symbol, twelve_key):
-    sym = symbol  # Keep as 'EUR/USD', don't strip the slash
+def fetch_twelve(symbol):
+    if is_fx:
+        sym = symbol.replace("/", "")
+    else:
+        sym = symbol_map[symbol]
     url = f"https://api.twelvedata.com/time_series?symbol={sym}&interval=5min&apikey={twelve_key}&outputsize=100"
-    
-    try:
-        response = requests.get(url)
-        data = response.json()
-        
-        # Debug: show API response for troubleshooting
-        st.code(data)
-
-        if "values" in data:
-            df = pd.DataFrame(data["values"])
-            df.rename(columns={"datetime": "datetime", "open": "open", "high": "high", 
-                               "low": "low", "close": "close", "volume": "volume"}, inplace=True)
-            df["datetime"] = pd.to_datetime(df["datetime"])
-            df = df.sort_values("datetime")
-            df.set_index("datetime", inplace=True)
-            df = df.astype(float)
-            return df
-        else:
-            st.error("❌ Twelve Data API error: " + str(data.get("message", "Unknown error.")))
-            return None
-
-    except Exception as e:
-        st.error(f"❌ Exception while fetching from Twelve Data: {e}")
+    r = requests.get(url)
+    data = r.json()
+    if "values" not in data:
         return None
-
     df = pd.DataFrame(data["values"])
     df.columns = [c.capitalize() for c in df.columns]
     df = df.set_index("Datetime")
