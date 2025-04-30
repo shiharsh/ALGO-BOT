@@ -48,6 +48,7 @@ def fetch_twelve(symbol):
         sym = symbol
     else:
         sym = symbol_map[symbol]
+        
    url = f"https://api.twelvedata.com/time_series?symbol={sym}&interval=5min&apikey={twelve_key}&outputsize=100"
     r = requests.get(url)
     data = r.json()
