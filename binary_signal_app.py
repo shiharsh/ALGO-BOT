@@ -45,12 +45,13 @@ def fetch_alpha(symbol):
 @st.cache_data(ttl=300)
 def fetch_twelve(symbol):
     if is_fx:
-        sym = symbol.replace("/", "")
+        sym = symbol
     else:
         sym = symbol_map[symbol]
-    url = f"https://api.twelvedata.com/time_series?symbol={sym}&interval=5min&apikey={twelve_key}&outputsize=100"
+   url = f"https://api.twelvedata.com/time_series?symbol={sym}&interval=5min&apikey={twelve_key}&outputsize=100"
     r = requests.get(url)
     data = r.json()
+st.code(data)  
     if "values" not in data:
         return None
     df = pd.DataFrame(data["values"])
