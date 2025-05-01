@@ -1,25 +1,10 @@
 import streamlit as st
 import pandas as pd
-import ta
-import requests
 import yfinance as yf
+import ta
 
-
-# ─── API KEYS ───────────────────────────────────────────
-alpha_key = "P4ISS18L9D90IZH4"
-twelve_key = "4d5b1e81f9314e28a7ee285497d3b273"
-
-# ─── SYMBOLS ────────────────────────────────────────────
+# ─── SYMBOL SELECTION ───────────────────────────────────
 symbol = st.selectbox("Choose a symbol:", ["EUR/USD", "GBP/USD", "BTC/USD", "ETH/USD", "AAPL", "TSLA"])
-symbol_map = {
-    "EUR/USD": ("EUR", "USD"),
-    "GBP/USD": ("GBP", "USD"),
-    "BTC/USD": ("BTC", "USD"),
-    "ETH/USD": ("ETH", "USD"),
-    "AAPL": "AAPL",
-    "TSLA": "TSLA"
-}
-is_fx = isinstance(symbol_map[symbol], tuple)
 
 # ─── FETCH FROM YAHOO FINANCE ───────────────────────────
 @st.cache_data(ttl=300)
@@ -38,8 +23,6 @@ def fetch_yahoo(symbol):
         return None
     df = df[["Open", "High", "Low", "Close", "Volume"]]
     return df
-
-
 
 # ─── TITLE AND LOAD DATA ────────────────────────────────
 st.title("📈 Binary Trading Signal Bot (5-Min) with Live Data")
