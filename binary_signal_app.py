@@ -9,12 +9,12 @@ import time
 finnhub_key = "d09hj5hr01qnv9cj0a10d09hj5hr01qnv9cj0a1g"
 
 # ─── SYMBOL MAPPING ─────────────────────────────────────
-symbol = st.selectbox("Choose a symbol:", ["AAPL", "BTC/USD", "EUR/USD"])
 finnhub_map = {
-  "AAPL": "AAPL",  # Stock - Allowed
     "BTC/USD": "BINANCE:BTCUSDT",  # Crypto - Allowed
     "EUR/USD": "OANDA:EUR_USD"  # Forex - Allowed
 }
+
+symbol = st.selectbox("Choose a symbol:", ["BTC/USD", "EUR/USD"])
 finnhub_symbol = finnhub_map[symbol]
 
 # ─── FETCH DATA FROM FINNHUB ────────────────────────────
@@ -23,7 +23,9 @@ def fetch_finnhub(symbol):
     now = int(time.time())
     past = now - 60 * 60 * 5  # last 5 hours
 
-    url = f"https://finnhub.io/api/v1/stock/candle?symbol={symbol}&resolution=5&from={past}&to={now}&token={finnhub_key}"
+    mapped = finnhub_map[symbol]
+  
+    url = f"https://finnhub.io/api/v1/stock/candle?symbol={mapped}&resolution=5&from={past}&to={now}&token={finnhub_key}"
     r = requests.get(url)
     
     # Debug: Show raw response
