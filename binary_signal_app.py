@@ -14,30 +14,27 @@ symbol_map = {
 
 symbol = st.selectbox("Choose a symbol:", list(symbol_map.keys()))
 
-# ─── FETCH DATA FROM YAHOO FINANCE ──────────────────────
+# ─── FETCH WITH DEBUG ───────────────────────────────────
 @st.cache_data(ttl=300)
 def fetch_yahoo(sym_key):
     yf_sym = symbol_map[sym_key]
-    # try 5-minute candles over the past 1 day
-    df = yf.download(
-        tickers=yf_sym,
-        interval="5m",
-        period="1d",
-        threads=False
-    )
-    # fallback to 1-hour if 5m is empty
+
+    # Try 5-min / 7d
+    df = yf.download(tickers=yf_sym, interval="5m", period="7d", threads=False)
+    st.write(f"⬇️ Downloaded for {yf_sym} ({sym_key}) — rows:", len(df))
+    st.write(df.tail(5))
+
+    # Fallback to 1h / 30d
     if df.empty:
-        df = yf.download(
-            tickers=yf_sym,
-            interval="1h",
-            period="5d",
-            threads=False
-        )
+        df = yf.download(tickers=yf_sym, interval="1h", period="30d", threads=False)
+        st.write(f"🔄 Fallback 1h for {yf_sym} — rows:", len(df))
+        st.write(df.tail(5))
+
     if df.empty:
         return None
     return df[["Open", "High", "Low", "Close", "Volume"]]
 
-# ─── TITLE AND DATA LOAD ───────────────────────────────
+# ─── TITLE & LOAD ──────────────────────────────────────
 st.title("📈 Binary Trading Signal Bot (Forex Pairs)")
 
 df = fetch_yahoo(symbol)
