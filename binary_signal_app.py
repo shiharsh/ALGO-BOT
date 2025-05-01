@@ -1,46 +1,59 @@
 import streamlit as st
 import pandas as pd
-import yfinance as yf
+import requests
 import ta
 
-# ─── SYMBOL MAPPING FOR FOREX PAIRS ─────────────────────
+# ─── YOUR TWELVE DATA API KEY ─────────────────────────
+twelve_key = "4d5b1e81f9314e28a7ee285497d3b273"  # ← replace with your own key
+
+# ─── SYMBOL MAPPING FOR FOREX PAIRS ────────────────────
+# Twelve Data expects symbols without the slash (e.g. EURUSD)
 symbol_map = {
-    "EUR/USD": "EURUSD=X",
-    "USD/JPY": "USDJPY=X",
-    "GBP/USD": "GBPUSD=X",
-    "AUD/USD": "AUDUSD=X",
-    "USD/CAD": "USDCAD=X"
+    "EUR/USD": "EURUSD",
+    "USD/JPY": "USDJPY",
+    "GBP/USD": "GBPUSD",
+    "AUD/USD": "AUDUSD",
+    "USD/CAD": "USDCAD"
 }
 
-symbol = st.selectbox("Choose a symbol:", list(symbol_map.keys()))
+symbol = st.selectbox("Choose a forex pair:", list(symbol_map.keys()))
 
-# ─── FETCH WITH DAILY INTERVAL ──────────────────────────
+# ─── FETCH FROM TWELVE DATA ────────────────────────────
 @st.cache_data(ttl=300)
-def fetch_yahoo(sym_key):
-    yf_sym = symbol_map[sym_key]
-
-    # 1) Try daily candles over the past 30 days
-    df = yf.download(
-        tickers=yf_sym,
-        interval="1d",
-        period="30d",
-        threads=False
+def fetch_twelve(sym_key):
+    sym = symbol_map[sym_key]
+    url = (
+        "https://api.twelvedata.com/time_series"
+        f"?symbol={sym}&interval=5min&outputsize=100&apikey={twelve_key}"
     )
+    r = requests.get(url, timeout=10)
+    data = r.json()
 
-    # Debug: show what Yahoo actually returned
-    st.write(f"⬇️ Downloaded for {yf_sym} ({sym_key}) — rows:", len(df))
-    st.write(df.tail(5))
+    # debug
+    st.write("Raw Twelve Data response:", data)
 
-    if df.empty:
+    if "values" not in data:
         return None
-    return df[["Open", "High", "Low", "Close", "Volume"]]
 
-# ─── TITLE & DATA LOAD ──────────────────────────────────
-st.title("📈 Binary Trading Signal Bot (Forex Pairs)")
+    df = pd.DataFrame(data["values"])
+    df = df.rename(columns={
+        "datetime": "Datetime",
+        "open":     "Open",
+        "high":     "High",
+        "low":      "Low",
+        "close":    "Close",
+        "volume":   "Volume"
+    })
+    df["Datetime"] = pd.to_datetime(df["Datetime"])
+    df = df.set_index("Datetime").astype(float)
+    return df.sort_index()
 
-df = fetch_yahoo(symbol)
+# ─── TITLE & LOAD DATA ─────────────────────────────────
+st.title("📈 Binary Trading Signal Bot (Forex Pairs, 5-min)")
+
+df = fetch_twelve(symbol)
 if df is None:
-    st.error("❌ Could not fetch any data from Yahoo Finance.")
+    st.error("❌ Could not fetch data from Twelve Data.")
     st.stop()
 
 # ─── INDICATORS ────────────────────────────────────────
@@ -60,9 +73,10 @@ def generate_signal(r):
 
 df["Signal"] = df.apply(generate_signal, axis=1)
 
-# ─── DISPLAY ───────────────────────────────────────────
+# ─── DISPLAY SIGNAL ────────────────────────────────────
 latest = df.iloc[-1]
 st.metric("📍 Signal", latest["Signal"], help="Based on EMA9, RSI & MACD")
 
+# ─── SHOW RECENT DATA ───────────────────────────────────
 with st.expander("📊 Show recent data"):
     st.dataframe(df.tail(10))
