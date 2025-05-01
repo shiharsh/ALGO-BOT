@@ -33,7 +33,6 @@ def fetch_alpha(symbol):
     
     r = requests.get(url)
     data = r.json()
-    st.write(data)
     if key not in data:
         return None
     df = pd.DataFrame(data[key]).T
@@ -52,23 +51,12 @@ def fetch_twelve(symbol):
     url = f"https://api.twelvedata.com/time_series?symbol={sym}&interval=5min&apikey={twelve_key}&outputsize=100"
     r = requests.get(url)
     data = r.json()
-    
     if "values" not in data:
-        st.error(f"⚠️ Twelve Data error: {data.get('message', 'Unknown error')}")
- 
-        
+        return None
     df = pd.DataFrame(data["values"])
-    df.rename(columns={
-    "datetime": "Datetime",
-    "open": "Open",
-    "high": "High",
-    "low": "Low",
-    "close": "Close",
-    "volume": "Volume"
-}, inplace=True)
-df["Datetime"] = pd.to_datetime(df["Datetime"])
-df = df.set_index("Datetime").astype(float).sort_index()
-   df = df.astype(float)
+    df.columns = [c.capitalize() for c in df.columns]
+    df = df.set_index("Datetime")
+    df = df.astype(float)
     df.index = pd.to_datetime(df.index)
     return df.sort_index()
 
