@@ -1,23 +1,20 @@
 import streamlit as st
 import pandas as pd
-import ta
 import requests
-from datetime import datetime, timedelta
 import time
+from datetime import datetime
+import ta
 
-# ─── YOUR FINNHUB API KEY ───────────────────────────────
+# ─── API KEY ────────────────────────────────────────────
 finnhub_key = "d09hj5hr01qnv9cj0a10d09hj5hr01qnv9cj0a1g"
 
-
-# ─── SYMBOL MAPPING ─────────────────────────────────────
-symbol = st.selectbox("Choose a symbol:", ["BTC/USD", "EUR/USD"])
-
+# ─── SYMBOLS ────────────────────────────────────────────
 finnhub_map = {
     "BTC/USD": "BINANCE:BTCUSDT",
     "EUR/USD": "OANDA:EUR_USD"
 }
 
-finnhub_symbol = finnhub_map[symbol]
+symbol = st.selectbox("Choose a symbol:", list(finnhub_map.keys()))
 
 # ─── FETCH DATA FROM FINNHUB ────────────────────────────
 @st.cache_data(ttl=300)
@@ -26,15 +23,13 @@ def fetch_finnhub(symbol):
     past = now - 60 * 60 * 5  # last 5 hours
 
     mapped = finnhub_map[symbol]
-  
     url = f"https://finnhub.io/api/v1/stock/candle?symbol={mapped}&resolution=5&from={past}&to={now}&token={finnhub_key}"
     r = requests.get(url)
-    
-    # Debug: Show raw response
-    st.write("API URL:", url)
-    st.write("Raw response JSON:", r.json())
-
     data = r.json()
+
+    st.write("Raw response JSON:")
+    st.write(data)
+
     if data.get("s") != "ok":
         return None
 
@@ -49,10 +44,11 @@ def fetch_finnhub(symbol):
     df.set_index("Time", inplace=True)
     return df
 
-# ─── TITLE AND FETCH DATA ───────────────────────────────
+# ─── TITLE AND LOAD DATA ────────────────────────────────
 st.title("📈 Binary Trading Signal Bot (5-Min) with Live Data")
 
-df = fetch_finnhub(finnhub_symbol)
+df = fetch_finnhub(symbol)
+
 if df is None:
     st.error("❌ Could not fetch data from Finnhub.")
     st.stop()
