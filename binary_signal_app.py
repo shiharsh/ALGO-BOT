@@ -6,10 +6,10 @@ import ta
 # ─── SYMBOL MAPPING FOR FOREX PAIRS ─────────────────────
 symbol_map = {
     "EUR/USD": "EURUSD=X",
-    "USD/JPY": "JPY=X",
+    "USD/JPY": "USDJPY=X",
     "GBP/USD": "GBPUSD=X",
     "AUD/USD": "AUDUSD=X",
-    "USD/CAD": "CAD=X"
+    "USD/CAD": "USDCAD=X"
 }
 
 symbol = st.selectbox("Choose a symbol:", list(symbol_map.keys()))
