@@ -7,13 +7,13 @@ import ta
 twelve_key = "4d5b1e81f9314e28a7ee285497d3b273"  # ← replace with your own key
 
 # ─── SYMBOL MAPPING FOR FOREX PAIRS ────────────────────
-# Twelve Data expects symbols without the slash (e.g. EURUSD)
+# Updated symbol format with slashes for Twelve Data
 symbol_map = {
-    "EUR/USD": "EURUSD",
-    "USD/JPY": "USDJPY",
-    "GBP/USD": "GBPUSD",
-    "AUD/USD": "AUDUSD",
-    "USD/CAD": "USDCAD"
+    "EUR/USD": "EUR/USD",
+    "USD/JPY": "USD/JPY",
+    "GBP/USD": "GBP/USD",
+    "AUD/USD": "AUD/USD",
+    "USD/CAD": "USD/CAD"
 }
 
 symbol = st.selectbox("Choose a forex pair:", list(symbol_map.keys()))
@@ -29,7 +29,7 @@ def fetch_twelve(sym_key):
     r = requests.get(url, timeout=10)
     data = r.json()
 
-    # debug
+    # Debug: show raw response
     st.write("Raw Twelve Data response:", data)
 
     if "values" not in data:
