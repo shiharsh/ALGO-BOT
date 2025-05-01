@@ -68,7 +68,6 @@ def fetch_twelve(symbol):
 }, inplace=True)
 df["Datetime"] = pd.to_datetime(df["Datetime"])
 df = df.set_index("Datetime").astype(float).sort_index()
-
    return df
     except Exception as e:
         st.error(f"❌ Failed to fetch Twelve Data: {e}")
