@@ -10,8 +10,8 @@ finnhub_key = "d09hj5hr01qnv9cj0a10d09hj5hr01qnv9cj0a1g"
 
 # ─── SYMBOLS ────────────────────────────────────────────
 finnhub_map = {
-    "BTC/USD": "BINANCE:BTCUSDT",
-    "EUR/USD": "OANDA:EUR_USD"
+    "AAPL": "AAPL",
+    "TSLA": "TSLA"
 }
 
 symbol = st.selectbox("Choose a symbol:", list(finnhub_map.keys()))
@@ -45,7 +45,7 @@ def fetch_finnhub(symbol):
     return df
 
 # ─── TITLE AND LOAD DATA ────────────────────────────────
-st.title("📈 Binary Trading Signal Bot (5-Min) with Live Data")
+st.title("📈 Binary Trading Signal Bot (5-Min) with Free Stock Data")
 
 df = fetch_finnhub(symbol)
 
