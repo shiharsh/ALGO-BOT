@@ -3,19 +3,18 @@ import pandas as pd
 import yfinance as yf
 import ta
 
-# ─── SYMBOL MAPPING ────────────────────────────────────
+# ─── SYMBOL MAPPING FOR FOREX PAIRS ─────────────────────
 symbol_map = {
     "EUR/USD": "EURUSD=X",
+    "USD/JPY": "JPY=X",
     "GBP/USD": "GBPUSD=X",
-    "BTC/USD": "BTC-USD",
-    "ETH/USD": "ETH-USD",
-    "AAPL":    "AAPL",
-    "TSLA":    "TSLA"
+    "AUD/USD": "AUDUSD=X",
+    "USD/CAD": "CAD=X"
 }
 
 symbol = st.selectbox("Choose a symbol:", list(symbol_map.keys()))
 
-# ─── FETCH FROM YAHOO FINANCE ─────────────────────────
+# ─── FETCH DATA FROM YAHOO FINANCE ──────────────────────
 @st.cache_data(ttl=300)
 def fetch_yahoo(sym_key):
     yf_sym = symbol_map[sym_key]
@@ -26,7 +25,7 @@ def fetch_yahoo(sym_key):
         period="1d",
         threads=False
     )
-    # fallback to 1-hour if 5m is empty (common on some forex pairs)
+    # fallback to 1-hour if 5m is empty
     if df.empty:
         df = yf.download(
             tickers=yf_sym,
@@ -36,24 +35,23 @@ def fetch_yahoo(sym_key):
         )
     if df.empty:
         return None
-    # keep only the columns we need
     return df[["Open", "High", "Low", "Close", "Volume"]]
 
-# ─── TITLE & DATA LOAD ─────────────────────────────────
-st.title("📈 Binary Trading Signal Bot (Yahoo Finance)")
+# ─── TITLE AND DATA LOAD ───────────────────────────────
+st.title("📈 Binary Trading Signal Bot (Forex Pairs)")
 
 df = fetch_yahoo(symbol)
 if df is None:
     st.error("❌ Could not fetch any data from Yahoo Finance.")
     st.stop()
 
-# ─── INDICATORS ───────────────────────────────────────
+# ─── INDICATORS ────────────────────────────────────────
 df["EMA9"] = ta.trend.ema_indicator(df["Close"], window=9)
 df["RSI"]  = ta.momentum.rsi(df["Close"], window=14)
 macd = ta.trend.MACD(df["Close"])
 df["MACD"] = macd.macd_diff()
 
-# ─── SIGNAL LOGIC ─────────────────────────────────────
+# ─── SIGNAL LOGIC ───────────────────────────────────────
 def generate_signal(r):
     if r["Close"] > r["EMA9"] and r["RSI"] > 50 and r["MACD"] > 0:
         return "CALL"
@@ -64,7 +62,7 @@ def generate_signal(r):
 
 df["Signal"] = df.apply(generate_signal, axis=1)
 
-# ─── DISPLAY ──────────────────────────────────────────
+# ─── DISPLAY ───────────────────────────────────────────
 latest = df.iloc[-1]
 st.metric("📍 Signal", latest["Signal"], help="Based on EMA9, RSI & MACD")
 
