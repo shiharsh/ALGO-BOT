@@ -4,10 +4,9 @@ import requests
 import ta
 
 # ─── YOUR TWELVE DATA API KEY ─────────────────────────
-twelve_key = "4d5b1e81f9314e28a7ee285497d3b273"  # ← replace with your own key
+twelve_key = "4d5b1e81f9314e28a7ee2854973b273"  # ← replace if needed
 
 # ─── SYMBOL MAPPING FOR FOREX PAIRS ────────────────────
-# Updated symbol format with slashes for Twelve Data
 symbol_map = {
     "EUR/USD": "EUR/USD",
     "USD/JPY": "USD/JPY",
@@ -29,10 +28,7 @@ def fetch_twelve(sym_key):
     r = requests.get(url, timeout=10)
     data = r.json()
 
-    # Debug: show raw response
-    st.write("Raw Twelve Data response:", data)
-
-    if "values" not in data:
+    if data.get("status") != "ok" or "values" not in data:
         return None
 
     df = pd.DataFrame(data["values"])
@@ -48,7 +44,7 @@ def fetch_twelve(sym_key):
     df = df.set_index("Datetime").astype(float)
     return df.sort_index()
 
-# ─── TITLE & LOAD DATA ─────────────────────────────────
+# ─── TITLE & DATA LOAD ─────────────────────────────────
 st.title("📈 Binary Trading Signal Bot (Forex Pairs, 5-min)")
 
 df = fetch_twelve(symbol)
@@ -73,10 +69,9 @@ def generate_signal(r):
 
 df["Signal"] = df.apply(generate_signal, axis=1)
 
-# ─── DISPLAY SIGNAL ────────────────────────────────────
+# ─── DISPLAY ───────────────────────────────────────────
 latest = df.iloc[-1]
 st.metric("📍 Signal", latest["Signal"], help="Based on EMA9, RSI & MACD")
 
-# ─── SHOW RECENT DATA ───────────────────────────────────
 with st.expander("📊 Show recent data"):
     st.dataframe(df.tail(10))
