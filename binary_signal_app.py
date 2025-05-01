@@ -68,10 +68,9 @@ def fetch_twelve(symbol):
 }, inplace=True)
 df["Datetime"] = pd.to_datetime(df["Datetime"])
 df = df.set_index("Datetime").astype(float).sort_index()
-   return df
-    except Exception as e:
-        st.error(f"❌ Failed to fetch Twelve Data: {e}")
-        return None
+   df = df.astype(float)
+    df.index = pd.to_datetime(df.index)
+    return df.sort_index()
 
 # ─── TITLE AND LOAD DATA ────────────────────────────────
 st.title("📈 Binary Trading Signal Bot (5-Min) with Live Data")
