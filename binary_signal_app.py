@@ -18,7 +18,10 @@ def fetch_yahoo(symbol):
         "TSLA": "TSLA"
     }
     yf_symbol = symbol_map_yf[symbol]
-    df = yf.download(tickers=yf_symbol, interval='5m', period='1d')
+df = yf.download(tickers=yf_symbol, interval='5m', period='1d', threads=False)
+st.write("Raw data:")
+st.write(df.tail())
+
     if df.empty:
         return None
     df = df[["Open", "High", "Low", "Close", "Volume"]]
