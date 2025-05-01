@@ -24,12 +24,16 @@ finnhub_symbol = finnhub_map[symbol]
 @st.cache_data(ttl=300)
 def fetch_finnhub(symbol):
     now = int(time.time())
-    past = now - 60 * 60 * 5  # last 5 hours (5-min candles)
+    past = now - 60 * 60 * 5  # last 5 hours
 
     url = f"https://finnhub.io/api/v1/stock/candle?symbol={symbol}&resolution=5&from={past}&to={now}&token={finnhub_key}"
     r = requests.get(url)
-    data = r.json()
+    
+    # Debug: Show raw response
+    st.write("API URL:", url)
+    st.write("Raw response JSON:", r.json())
 
+    data = r.json()
     if data.get("s") != "ok":
         return None
 
