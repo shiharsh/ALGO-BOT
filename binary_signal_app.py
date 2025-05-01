@@ -33,6 +33,7 @@ def fetch_alpha(symbol):
     
     r = requests.get(url)
     data = r.json()
+    st.write(data)
     if key not in data:
         return None
     df = pd.DataFrame(data[key]).T
