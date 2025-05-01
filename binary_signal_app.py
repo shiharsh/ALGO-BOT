@@ -1,37 +1,55 @@
 import streamlit as st
 import pandas as pd
-import yfinance as yf
 import ta
+import requests
+from datetime import datetime, timedelta
+import time
 
-# ─── SYMBOL SELECTION ───────────────────────────────────
+# ─── YOUR FINNHUB API KEY ───────────────────────────────
+finnhub_key = "d09hj5hr01qnv9cj0a10d09hj5hr01qnv9cj0a1g"
+
+# ─── SYMBOL MAPPING ─────────────────────────────────────
 symbol = st.selectbox("Choose a symbol:", ["EUR/USD", "GBP/USD", "BTC/USD", "ETH/USD", "AAPL", "TSLA"])
+finnhub_map = {
+    "EUR/USD": "OANDA:EUR_USD",
+    "GBP/USD": "OANDA:GBP_USD",
+    "BTC/USD": "BINANCE:BTCUSDT",
+    "ETH/USD": "BINANCE:ETHUSDT",
+    "AAPL": "AAPL",
+    "TSLA": "TSLA"
+}
+finnhub_symbol = finnhub_map[symbol]
 
-# ─── FETCH FROM YAHOO FINANCE ───────────────────────────
+# ─── FETCH DATA FROM FINNHUB ────────────────────────────
 @st.cache_data(ttl=300)
-def fetch_yahoo(symbol):
-    symbol_map_yf = {
-        "EUR/USD": "EURUSD=X",
-        "GBP/USD": "GBPUSD=X",
-        "BTC/USD": "BTC-USD",
-        "ETH/USD": "ETH-USD",
-        "AAPL": "AAPL",
-        "TSLA": "TSLA"
-    }
-    yf_symbol = symbol_map_yf[symbol]
-    df = yf.download(tickers=yf_symbol, interval='5m', period='1d', threads=False)
-    st.write("Raw data:")
-    st.write(df.tail())
-    if df.empty:
+def fetch_finnhub(symbol):
+    now = int(time.time())
+    past = now - 60 * 60 * 5  # last 5 hours (5-min candles)
+
+    url = f"https://finnhub.io/api/v1/stock/candle?symbol={symbol}&resolution=5&from={past}&to={now}&token={finnhub_key}"
+    r = requests.get(url)
+    data = r.json()
+
+    if data.get("s") != "ok":
         return None
-    df = df[["Open", "High", "Low", "Close", "Volume"]]
+
+    df = pd.DataFrame({
+        "Time": [datetime.fromtimestamp(t) for t in data["t"]],
+        "Open": data["o"],
+        "High": data["h"],
+        "Low": data["l"],
+        "Close": data["c"],
+        "Volume": data["v"]
+    })
+    df.set_index("Time", inplace=True)
     return df
 
-# ─── TITLE AND LOAD DATA ────────────────────────────────
+# ─── TITLE AND FETCH DATA ───────────────────────────────
 st.title("📈 Binary Trading Signal Bot (5-Min) with Live Data")
 
-df = fetch_yahoo(symbol)
+df = fetch_finnhub(finnhub_symbol)
 if df is None:
-    st.error("❌ Could not fetch data from Yahoo Finance.")
+    st.error("❌ Could not fetch data from Finnhub.")
     st.stop()
 
 # ─── INDICATORS ─────────────────────────────────────────
