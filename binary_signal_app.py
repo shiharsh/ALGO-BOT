@@ -2,6 +2,8 @@ import streamlit as st
 import pandas as pd
 import ta
 import requests
+import yfinance as yf
+
 
 # ─── API KEYS ───────────────────────────────────────────
 alpha_key = "P4ISS18L9D90IZH4"
@@ -19,58 +21,32 @@ symbol_map = {
 }
 is_fx = isinstance(symbol_map[symbol], tuple)
 
-# ─── FETCH FROM ALPHA VANTAGE ───────────────────────────
+# ─── FETCH FROM YAHOO FINANCE ───────────────────────────
 @st.cache_data(ttl=300)
-def fetch_alpha(symbol):
-    if is_fx:
-        from_sym, to_sym = symbol_map[symbol]
-        url = f"https://www.alphavantage.co/query?function=FX_INTRADAY&from_symbol={from_sym}&to_symbol={to_sym}&interval=5min&apikey={alpha_key}"
-        key = "Time Series FX (5min)"
-    else:
-        sym = symbol_map[symbol]
-        url = f"https://www.alphavantage.co/query?function=TIME_SERIES_INTRADAY&symbol={sym}&interval=5min&apikey={alpha_key}"
-        key = "Time Series (5min)"
-    
-    r = requests.get(url)
-    data = r.json()
-    st.write(data)
-    if key not in data:
+def fetch_yahoo(symbol):
+    symbol_map_yf = {
+        "EUR/USD": "EURUSD=X",
+        "GBP/USD": "GBPUSD=X",
+        "BTC/USD": "BTC-USD",
+        "ETH/USD": "ETH-USD",
+        "AAPL": "AAPL",
+        "TSLA": "TSLA"
+    }
+    yf_symbol = symbol_map_yf[symbol]
+    df = yf.download(tickers=yf_symbol, interval='5m', period='1d')
+    if df.empty:
         return None
-    df = pd.DataFrame(data[key]).T
-    df.columns = ["Open", "High", "Low", "Close"]
-    df = df.astype(float)
-    df.index = pd.to_datetime(df.index)
-    return df.sort_index()
+    df = df[["Open", "High", "Low", "Close", "Volume"]]
+    return df
 
-# ─── FETCH FROM TWELVE DATA ─────────────────────────────
-@st.cache_data(ttl=300)
-def fetch_twelve(symbol):
-    if is_fx:
-        sym = symbol.replace("/", "")
-    else:
-        sym = symbol_map[symbol]
-    url = f"https://api.twelvedata.com/time_series?symbol={sym}&interval=5min&apikey={twelve_key}&outputsize=100"
-    r = requests.get(url)
-    data = r.json()
-    if "values" not in data:
-        return None
-    df = pd.DataFrame(data["values"])
-    df.columns = [c.capitalize() for c in df.columns]
-    df = df.set_index("Datetime")
-    df = df.astype(float)
-    df.index = pd.to_datetime(df.index)
-    return df.sort_index()
+
 
 # ─── TITLE AND LOAD DATA ────────────────────────────────
 st.title("📈 Binary Trading Signal Bot (5-Min) with Live Data")
 
-df = fetch_alpha(symbol)
+df = fetch_yahoo(symbol)
 if df is None:
-    st.warning("⚠️ Alpha Vantage failed – switching to Twelve Data...")
-    df = fetch_twelve(symbol)
-
-if df is None:
-    st.error("❌ Could not fetch data from either Alpha Vantage or Twelve Data.")
+    st.error("❌ Could not fetch data from Yahoo Finance.")
     st.stop()
 
 # ─── INDICATORS ─────────────────────────────────────────
