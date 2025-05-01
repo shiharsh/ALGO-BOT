@@ -8,13 +8,15 @@ import time
 # ─── YOUR FINNHUB API KEY ───────────────────────────────
 finnhub_key = "d09hj5hr01qnv9cj0a10d09hj5hr01qnv9cj0a1g"
 
+
 # ─── SYMBOL MAPPING ─────────────────────────────────────
+symbol = st.selectbox("Choose a symbol:", ["BTC/USD", "EUR/USD"])
+
 finnhub_map = {
-    "BTC/USD": "BINANCE:BTCUSDT",  # Crypto - Allowed
-    "EUR/USD": "OANDA:EUR_USD"  # Forex - Allowed
+    "BTC/USD": "BINANCE:BTCUSDT",
+    "EUR/USD": "OANDA:EUR_USD"
 }
 
-symbol = st.selectbox("Choose a symbol:", ["BTC/USD", "EUR/USD"])
 finnhub_symbol = finnhub_map[symbol]
 
 # ─── FETCH DATA FROM FINNHUB ────────────────────────────
