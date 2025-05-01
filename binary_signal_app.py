@@ -3,9 +3,15 @@ import pandas as pd
 import requests
 import ta
 import time
+from datetime import datetime, timedelta
+from streamlit_autorefresh import st_autorefresh
+
+# ─── AUTO-REFRESH EVERY SECOND ────────────────────────
+# Needed for accurate countdown timer (cached data still updates every 5 mins)
+st_autorefresh(interval=1000, limit=None, key="timer_refresh")
 
 # ─── YOUR TWELVE DATA API KEY ─────────────────────────
-twelve_key = "4d5b1e81f9314e28a7ee285497d3b273"  # ← replace with your own key
+twelve_key = "4d5b1e81f9314e28a7ee285497d3b273"
 
 # ─── SYMBOL MAPPING FOR FOREX PAIRS ────────────────────
 symbol_map = {
@@ -24,14 +30,12 @@ def fetch_twelve(sym_key):
     sym = symbol_map[sym_key]
     url = (
         "https://api.twelvedata.com/time_series"
-        f"?symbol={sym}&interval=5min&outputsize=100&apikey={twelve_key}"
+        f"?symbol={sym}&interval=5min&outputsize=500&apikey={twelve_key}"
     )
     r = requests.get(url, timeout=10)
     data = r.json()
-
-    if "values" not in data:
+    if data.get("status") != "ok" or "values" not in data:
         return None
-
     df = pd.DataFrame(data["values"])
     df = df.rename(columns={
         "datetime": "Datetime",
@@ -59,7 +63,6 @@ df["RSI"]  = ta.momentum.rsi(df["Close"], window=14)
 macd = ta.trend.MACD(df["Close"])
 df["MACD"] = macd.macd_diff()
 
-# ─── SIGNAL LOGIC ───────────────────────────────────────
 def generate_signal(r):
     if r["Close"] > r["EMA9"] and r["RSI"] > 50 and r["MACD"] > 0:
         return "CALL"
@@ -70,62 +73,48 @@ def generate_signal(r):
 
 df["Signal"] = df.apply(generate_signal, axis=1)
 
-# ─── TRACKING LIVE ACCURACY ────────────────────────────
-if "accuracy" not in st.session_state:
-    st.session_state.accuracy = []
-    st.session_state.correct_signals = 0
-    st.session_state.total_signals = 0
+# ─── LIVE ACCURACY TRACKING OVER SESSION ───────────────
+if "history" not in st.session_state:
+    st.session_state.history = []  # list of {'time': datetime, 'outcome': int, 'accuracy': float}
 
-# Store the most recent signal for comparison
-latest = df.iloc[-1]
-st.session_state.total_signals += 1
+# Compute outcome for last closed candle
+data_time = df.index[-1]
+outcome = 1 if ((df.iloc[-1]['Signal'] == 'CALL' and df.iloc[-1]['Close'] > df.iloc[-1]['Open']) or
+                   (df.iloc[-1]['Signal'] == 'PUT'  and df.iloc[-1]['Close'] < df.iloc[-1]['Open'])) else 0
 
-# Check if the prediction was correct (for demonstration, compare with close)
-if latest["Signal"] == "CALL" and latest["Close"] > latest["Open"]:
-    st.session_state.correct_signals += 1
-elif latest["Signal"] == "PUT" and latest["Close"] < latest["Open"]:
-    st.session_state.correct_signals += 1
-
-# Calculate accuracy
-accuracy = (st.session_state.correct_signals / st.session_state.total_signals) * 100
-
-# ─── COUNTDOWN TIMER ───────────────────────────────────
-countdown = 5 * 60  # 5 minutes countdown in seconds
-if "time_left" not in st.session_state:
-    st.session_state.time_left = countdown
-
-if st.session_state.time_left > 0:
-    st.session_state.time_left -= 60  # Subtract 60 seconds each refresh
-    st.metric("⏳ Countdown", f"{st.session_state.time_left // 60} min {st.session_state.time_left % 60} sec")
+# Only append if new candle (avoid duplicates)
+if not st.session_state.history or st.session_state.history[-1]['time'] != data_time:
+    total = len(st.session_state.history) + 1
+    correct = sum(item['outcome'] for item in st.session_state.history) + outcome
+    accuracy = (correct / total) * 100
+    st.session_state.history.append({'time': data_time, 'outcome': outcome, 'accuracy': accuracy})
 else:
-    # Reset timer when countdown ends
-    st.session_state.time_left = countdown
+    # reuse last accuracy
+    accuracy = st.session_state.history[-1]['accuracy']
 
-# ─── DISPLAY SIGNAL ────────────────────────────────────
-st.metric("📍 Signal", latest["Signal"], help="Based on EMA9, RSI & MACD")
+# ─── COUNTDOWN TIMER (to next 5-min candle) ───────────
+now = datetime.now()
+# Calculate next candle time: round up to next multiple of 5 minutes
+minute = (now.minute // 5) * 5
+next_time = (now.replace(minute=minute, second=0, microsecond=0) + timedelta(minutes=5))
+remaining = (next_time - now).total_seconds()
+minutes, seconds = divmod(int(remaining), 60)
 
-# ─── DISPLAY LIVE ACCURACY ─────────────────────────────
-st.metric("📊 Live Accuracy", f"{accuracy:.2f}%", help="Based on past signals accuracy")
+# ─── DISPLAY METRICS ──────────────────────────────────
+st.metric("⏳ Time to next candle", f"{minutes}m {seconds}s")
+st.metric("📍 Latest Signal", df.iloc[-1]["Signal"], help="Based on EMA9, RSI & MACD")
+st.metric("🔎 Live Accuracy", f"{accuracy:.2f}%", help="Accuracy over session")
 
-# ─── SHOW RECENT DATA AND BACKTESTING ──────────────────
-with st.expander("📊 Show recent data"):
+# ─── ACCURACY CHART AND DATA ───────────────────────────
+hist_df = pd.DataFrame(st.session_state.history).set_index('time')
+st.line_chart(hist_df['accuracy'], height=200)
+
+with st.expander("📊 Show recent data & history"):
     st.dataframe(df.tail(10))
+    st.dataframe(hist_df.tail(10))
 
-# ─── DOWNLOAD BACKTEST RESULTS ─────────────────────────
-backtest_data = pd.DataFrame({
-    "Signal": df["Signal"],
-    "Actual": ["CALL" if row["Close"] > row["Open"] else "PUT" for _, row in df.iterrows()],
-    "Correct": [1 if row["Signal"] == ("CALL" if row["Close"] > row["Open"] else "PUT") else 0 for _, row in df.iterrows()]
-})
-backtest_data["Cumulative Correct"] = backtest_data["Correct"].cumsum()
-
-@st.cache_data(ttl=600)
-def download_backtest():
-    return backtest_data
-
+# ─── DOWNLOAD HISTORY CSV ──────────────────────────────
+csv = hist_df.to_csv().encode('utf-8')
 st.download_button(
-    label="Download Backtest Results",
-    data=download_backtest().to_csv(index=False),
-    file_name="backtest_results.csv",
-    mime="text/csv"
+    "Download session history as CSV", csv, file_name="session_history.csv", mime="text/csv"
 )
