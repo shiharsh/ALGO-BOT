@@ -9,14 +9,11 @@ import time
 finnhub_key = "d09hj5hr01qnv9cj0a10d09hj5hr01qnv9cj0a1g"
 
 # ─── SYMBOL MAPPING ─────────────────────────────────────
-symbol = st.selectbox("Choose a symbol:", ["EUR/USD", "GBP/USD", "BTC/USD", "ETH/USD", "AAPL", "TSLA"])
+symbol = st.selectbox("Choose a symbol:", ["AAPL", "BTC/USD", "EUR/USD"])
 finnhub_map = {
-    "EUR/USD": "OANDA:EUR_USD",
-    "GBP/USD": "OANDA:GBP_USD",
-    "BTC/USD": "BINANCE:BTCUSDT",
-    "ETH/USD": "BINANCE:ETHUSDT",
-    "AAPL": "AAPL",
-    "TSLA": "TSLA"
+  "AAPL": "AAPL",  # Stock - Allowed
+    "BTC/USD": "BINANCE:BTCUSDT",  # Crypto - Allowed
+    "EUR/USD": "OANDA:EUR_USD"  # Forex - Allowed
 }
 finnhub_symbol = finnhub_map[symbol]
 
