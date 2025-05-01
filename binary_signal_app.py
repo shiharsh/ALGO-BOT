@@ -55,7 +55,7 @@ def fetch_twelve(symbol):
     
     if "values" not in data:
         st.error(f"⚠️ Twelve Data error: {data.get('message', 'Unknown error')}")
-            return None
+ 
         
     df = pd.DataFrame(data["values"])
     df.rename(columns={
