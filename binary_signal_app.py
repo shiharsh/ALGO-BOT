@@ -7,7 +7,6 @@ from datetime import datetime, timedelta
 from streamlit_autorefresh import st_autorefresh
 
 # ─── AUTO-REFRESH EVERY SECOND ────────────────────────
-# Needed for accurate countdown timer (cached data still updates every 5 mins)
 st_autorefresh(interval=1000, limit=None, key="timer_refresh")
 
 # ─── YOUR TWELVE DATA API KEY ─────────────────────────
@@ -21,7 +20,6 @@ symbol_map = {
     "AUD/USD": "AUD/USD",
     "USD/CAD": "USD/CAD"
 }
-
 symbol = st.selectbox("Choose a forex pair:", list(symbol_map.keys()))
 
 # ─── FETCH FROM TWELVE DATA ────────────────────────────
@@ -73,43 +71,41 @@ def generate_signal(r):
 
 df["Signal"] = df.apply(generate_signal, axis=1)
 
-# ─── LIVE ACCURACY TRACKING OVER SESSION ───────────────
+# ─── SESSION STATE FOR LIVE ACCURACY ───────────────────
 if "history" not in st.session_state:
-    st.session_state.history = []  # list of {'time': datetime, 'outcome': int, 'accuracy': float}
+    st.session_state.history = []
 
-# Compute outcome for last closed candle
-data_time = df.index[-1]
+# ─── ACTUAL OUTCOME CALCULATION ────────────────────────
+last_time = df.index[-1]
 outcome = 1 if ((df.iloc[-1]['Signal'] == 'CALL' and df.iloc[-1]['Close'] > df.iloc[-1]['Open']) or
-                   (df.iloc[-1]['Signal'] == 'PUT'  and df.iloc[-1]['Close'] < df.iloc[-1]['Open'])) else 0
+                (df.iloc[-1]['Signal'] == 'PUT'  and df.iloc[-1]['Close'] < df.iloc[-1]['Open'])) else 0
 
-# Only append if new candle (avoid duplicates)
-if not st.session_state.history or st.session_state.history[-1]['time'] != data_time:
+# ─── AVOID DUPLICATE ACCURACY ENTRIES ─────────────────
+if not st.session_state.history or st.session_state.history[-1]['time'] != last_time:
     total = len(st.session_state.history) + 1
     correct = sum(item['outcome'] for item in st.session_state.history) + outcome
     accuracy = (correct / total) * 100
-    st.session_state.history.append({'time': data_time, 'outcome': outcome, 'accuracy': accuracy})
+    st.session_state.history.append({'time': last_time, 'outcome': outcome, 'accuracy': accuracy})
 else:
-    # reuse last accuracy
     accuracy = st.session_state.history[-1]['accuracy']
 
-# ─── COUNTDOWN TIMER (to next 5-min candle) ───────────
+# ─── COUNTDOWN TIMER TO NEXT 5-MIN CANDLE ─────────────
 now = datetime.now()
-# Calculate next candle time: round up to next multiple of 5 minutes
 minute = (now.minute // 5) * 5
-next_time = (now.replace(minute=minute, second=0, microsecond=0) + timedelta(minutes=5))
-remaining = (next_time - now).total_seconds()
+next_candle_time = (now.replace(minute=minute, second=0, microsecond=0) + timedelta(minutes=5))
+remaining = (next_candle_time - now).total_seconds()
 minutes, seconds = divmod(int(remaining), 60)
 
 # ─── DISPLAY METRICS ──────────────────────────────────
 st.metric("⏳ Time to next candle", f"{minutes}m {seconds}s")
 st.metric("📍 Latest Signal", df.iloc[-1]["Signal"], help="Based on EMA9, RSI & MACD")
-st.metric("🔎 Live Accuracy", f"{accuracy:.2f}%", help="Accuracy over session")
+st.metric("🔎 Live Accuracy", f"{accuracy:.2f}%", help="Accuracy tracked this session")
 
-# ─── ACCURACY CHART AND DATA ───────────────────────────
+# ─── ACCURACY HISTORY CHART ────────────────────────────
 hist_df = pd.DataFrame(st.session_state.history).set_index('time')
 st.line_chart(hist_df['accuracy'], height=200)
 
-with st.expander("📊 Show recent data & history"):
+with st.expander("📊 Show recent data & signal history"):
     st.dataframe(df.tail(10))
     st.dataframe(hist_df.tail(10))
 
