@@ -1,5 +1,8 @@
 streamlit
 yfinance
-ta
 pandas
 streamlit-autorefresh
+ta
+joblib
+requests
+scikit-learn
