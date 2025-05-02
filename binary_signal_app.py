@@ -62,14 +62,28 @@ if df is None:
 
 # ─── INDICATORS ────────────────────────────────────────
 df["EMA9"] = ta.trend.ema_indicator(df["Close"], window=9)
+df["EMA21"] = ta.trend.ema_indicator(df["Close"], window=21)
 df["RSI"]  = ta.momentum.rsi(df["Close"], window=14)
+
 macd = ta.trend.MACD(df["Close"])
 df["MACD"] = macd.macd_diff()
 
+bb = ta.volatility.BollingerBands(df["Close"], window=20, window_dev=2)
+df["BB_upper"] = bb.bollinger_hband()
+df["BB_lower"] = bb.bollinger_lband()
+
+# ─── REVISED SIGNAL LOGIC ──────────────────────────────
 def generate_signal(r):
-    if r["Close"] > r["EMA9"] and r["RSI"] > 50 and r["MACD"] > 0:
+    trend_up = r["EMA9"] > r["EMA21"]
+    trend_down = r["EMA9"] < r["EMA21"]
+    momentum_up = r["RSI"] > 55 and r["MACD"] > 0
+    momentum_down = r["RSI"] < 45 and r["MACD"] < 0
+    breakout_up = r["Close"] > r["BB_upper"]
+    breakout_down = r["Close"] < r["BB_lower"]
+
+    if trend_up and momentum_up and breakout_up:
         return "CALL"
-    elif r["Close"] < r["EMA9"] and r["RSI"] < 50 and r["MACD"] < 0:
+    elif trend_down and momentum_down and breakout_down:
         return "PUT"
     else:
         return "HOLD"
@@ -103,7 +117,7 @@ minutes, seconds = divmod(int(remaining), 60)
 
 # ─── DISPLAY METRICS ──────────────────────────────────
 st.metric("⏳ Time to next candle", f"{minutes}m {seconds}s")
-st.metric("📍 Latest Signal", df.iloc[-1]["Signal"], help="Based on EMA9, RSI & MACD")
+st.metric("📍 Latest Signal", df.iloc[-1]["Signal"], help="Based on EMA9, EMA21, RSI, MACD & Bollinger Bands")
 st.metric("🔎 Live Accuracy", f"{accuracy:.2f}%", help="Accuracy tracked this session")
 
 # ─── ACCURACY HISTORY CHART ────────────────────────────
