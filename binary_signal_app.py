@@ -5,6 +5,7 @@ import ta
 import time
 from datetime import datetime, timedelta
 from streamlit_autorefresh import st_autorefresh
+from zoneinfo import ZoneInfo  # ✅ For IST time zone
 
 # ─── AUTO-REFRESH EVERY SECOND ────────────────────────
 st_autorefresh(interval=1000, limit=None, key="timer_refresh")
@@ -45,6 +46,10 @@ def fetch_twelve(sym_key):
     })
     df["Datetime"] = pd.to_datetime(df["Datetime"])
     df = df.set_index("Datetime").astype(float)
+
+    # ✅ Convert time from UTC to IST
+    df.index = df.index.tz_localize("UTC").tz_convert("Asia/Kolkata")
+
     return df.sort_index()
 
 # ─── TITLE & LOAD DATA ─────────────────────────────────
@@ -89,8 +94,8 @@ if not st.session_state.history or st.session_state.history[-1]['time'] != last_
 else:
     accuracy = st.session_state.history[-1]['accuracy']
 
-# ─── COUNTDOWN TIMER TO NEXT 5-MIN CANDLE ─────────────
-now = datetime.now()
+# ─── COUNTDOWN TIMER TO NEXT 5-MIN CANDLE (IST) ────────
+now = datetime.now(ZoneInfo("Asia/Kolkata"))
 minute = (now.minute // 5) * 5
 next_candle_time = (now.replace(minute=minute, second=0, microsecond=0) + timedelta(minutes=5))
 remaining = (next_candle_time - now).total_seconds()
