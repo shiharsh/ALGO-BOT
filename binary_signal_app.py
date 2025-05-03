@@ -1,3 +1,6 @@
+import os
+if not os.path.exists("rf_model.pkl"):
+    import train_model  # this will run and create rf_model.pkl
 
 import streamlit as st
 import pandas as pd
