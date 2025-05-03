@@ -8,6 +8,53 @@ from datetime import datetime, timedelta
 from streamlit_autorefresh import st_autorefresh
 from zoneinfo import ZoneInfo  # ✅ For IST time zone
 
+# ─── MODEL TRAINING SECTION ───────────────────────────
+import os
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score
+import joblib
+
+@st.cache_resource
+def train_rf_model_from_csv():
+    path = "eurusd_5min_history_under25mb.csv"
+    if not os.path.exists(path):
+        st.warning("Upload the CSV file named: eurusd_5min_history_under25mb.csv")
+        return None
+
+    df = pd.read_csv(path, parse_dates=["Datetime"])
+    df = df.sort_values("Datetime")
+    df["EMA9"] = ta.trend.ema_indicator(df["Close"], window=9)
+    df["RSI"] = ta.momentum.rsi(df["Close"], window=14)
+    macd = ta.trend.MACD(df["Close"])
+    df["MACD"] = macd.macd_diff()
+
+    df.dropna(inplace=True)
+
+    # Create label: 1 = CALL, 0 = PUT
+    df["Target"] = (df["Close"].shift(-1) > df["Close"]).astype(int)
+
+    features = df[["EMA9", "RSI", "MACD"]]
+    target = df["Target"]
+
+    X_train, X_test, y_train, y_test = train_test_split(features, target, test_size=0.2, shuffle=False)
+
+    model = RandomForestClassifier(n_estimators=100, random_state=42)
+    model.fit(X_train, y_train)
+
+    # Evaluate model
+    preds = model.predict(X_test)
+    acc = accuracy_score(y_test, preds)
+    st.success(f"✅ Model trained with accuracy: {acc:.2f}")
+
+    # Save model
+    joblib.dump(model, "rf_model.pkl")
+    return model
+
+# Train and cache the model
+model = train_rf_model_from_csv()
+
+
 # ─── AUTO-REFRESH EVERY SECOND ────────────────────────
 st_autorefresh(interval=1000, limit=None, key="timer_refresh")
 
