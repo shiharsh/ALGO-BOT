@@ -3,57 +3,9 @@ import pandas as pd
 import requests
 import ta
 import time
-import joblib  # ✅ Load ML model
 from datetime import datetime, timedelta
 from streamlit_autorefresh import st_autorefresh
 from zoneinfo import ZoneInfo  # ✅ For IST time zone
-
-# ─── MODEL TRAINING SECTION ───────────────────────────
-import os
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score
-import joblib
-
-@st.cache_resource
-def train_rf_model_from_csv():
-    path = "eurusd_5min_history_under25mb.csv"
-    if not os.path.exists(path):
-        st.warning("Upload the CSV file named: eurusd_5min_history_under25mb.csv")
-        return None
-
-    df = pd.read_csv(path, parse_dates=["Datetime"])
-    df = df.sort_values("Datetime")
-    df["EMA9"] = ta.trend.ema_indicator(df["Close"], window=9)
-    df["RSI"] = ta.momentum.rsi(df["Close"], window=14)
-    macd = ta.trend.MACD(df["Close"])
-    df["MACD"] = macd.macd_diff()
-
-    df.dropna(inplace=True)
-
-    # Create label: 1 = CALL, 0 = PUT
-    df["Target"] = (df["Close"].shift(-1) > df["Close"]).astype(int)
-
-    features = df[["EMA9", "RSI", "MACD"]]
-    target = df["Target"]
-
-    X_train, X_test, y_train, y_test = train_test_split(features, target, test_size=0.2, shuffle=False)
-
-    model = RandomForestClassifier(n_estimators=100, random_state=42)
-    model.fit(X_train, y_train)
-
-    # Evaluate model
-    preds = model.predict(X_test)
-    acc = accuracy_score(y_test, preds)
-    st.success(f"✅ Model trained with accuracy: {acc:.2f}")
-
-    # Save model
-    joblib.dump(model, "rf_model.pkl")
-    return model
-
-# Train and cache the model
-model = train_rf_model_from_csv()
-
 
 # ─── AUTO-REFRESH EVERY SECOND ────────────────────────
 st_autorefresh(interval=1000, limit=None, key="timer_refresh")
@@ -110,30 +62,33 @@ if df is None:
 
 # ─── INDICATORS ────────────────────────────────────────
 df["EMA9"] = ta.trend.ema_indicator(df["Close"], window=9)
+df["EMA21"] = ta.trend.ema_indicator(df["Close"], window=21)
 df["RSI"]  = ta.momentum.rsi(df["Close"], window=14)
+
 macd = ta.trend.MACD(df["Close"])
 df["MACD"] = macd.macd_diff()
 
-# ✅ Load trained ML model
-model = joblib.load("rf_model.pkl")
+bb = ta.volatility.BollingerBands(df["Close"], window=20, window_dev=2)
+df["BB_upper"] = bb.bollinger_hband()
+df["BB_lower"] = bb.bollinger_lband()
 
+# ─── REVISED SIGNAL LOGIC ──────────────────────────────
 def generate_signal(r):
-    if r["Close"] > r["EMA9"] and r["RSI"] > 50 and r["MACD"] > 0:
+    trend_up = r["EMA9"] > r["EMA21"]
+    trend_down = r["EMA9"] < r["EMA21"]
+    momentum_up = r["RSI"] > 55 and r["MACD"] > 0
+    momentum_down = r["RSI"] < 45 and r["MACD"] < 0
+    breakout_up = r["Close"] > r["BB_upper"]
+    breakout_down = r["Close"] < r["BB_lower"]
+
+    if trend_up and momentum_up and breakout_up:
         return "CALL"
-    elif r["Close"] < r["EMA9"] and r["RSI"] < 50 and r["MACD"] < 0:
+    elif trend_down and momentum_down and breakout_down:
         return "PUT"
     else:
         return "HOLD"
 
-def generate_ml_signal(row):
-    if pd.isna(row["EMA9"]) or pd.isna(row["RSI"]) or pd.isna(row["MACD"]):
-        return "HOLD"
-    features = [row["EMA9"], row["RSI"], row["MACD"]]
-    pred = model.predict([features])[0]
-    return "CALL" if pred == 1 else "PUT"
-
 df["Signal"] = df.apply(generate_signal, axis=1)
-df["ML_Signal"] = df.apply(generate_ml_signal, axis=1)
 
 # ─── SESSION STATE FOR LIVE ACCURACY ───────────────────
 if "history" not in st.session_state:
@@ -141,8 +96,8 @@ if "history" not in st.session_state:
 
 # ─── ACTUAL OUTCOME CALCULATION ────────────────────────
 last_time = df.index[-1]
-outcome = 1 if ((df.iloc[-1]['ML_Signal'] == 'CALL' and df.iloc[-1]['Close'] > df.iloc[-1]['Open']) or
-                (df.iloc[-1]['ML_Signal'] == 'PUT'  and df.iloc[-1]['Close'] < df.iloc[-1]['Open'])) else 0
+outcome = 1 if ((df.iloc[-1]['Signal'] == 'CALL' and df.iloc[-1]['Close'] > df.iloc[-1]['Open']) or
+                (df.iloc[-1]['Signal'] == 'PUT'  and df.iloc[-1]['Close'] < df.iloc[-1]['Open'])) else 0
 
 # ─── AVOID DUPLICATE ACCURACY ENTRIES ─────────────────
 if not st.session_state.history or st.session_state.history[-1]['time'] != last_time:
@@ -162,8 +117,7 @@ minutes, seconds = divmod(int(remaining), 60)
 
 # ─── DISPLAY METRICS ──────────────────────────────────
 st.metric("⏳ Time to next candle", f"{minutes}m {seconds}s")
-st.metric("📍 Traditional Signal", df.iloc[-1]["Signal"])
-st.metric("🤖 ML-Based Signal", df.iloc[-1]["ML_Signal"], help="Predicted using Random Forest model")
+st.metric("📍 Latest Signal", df.iloc[-1]["Signal"], help="Based on EMA9, EMA21, RSI, MACD & Bollinger Bands")
 st.metric("🔎 Live Accuracy", f"{accuracy:.2f}%", help="Accuracy tracked this session")
 
 # ─── ACCURACY HISTORY CHART ────────────────────────────
