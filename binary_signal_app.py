@@ -9,6 +9,7 @@ from zoneinfo import ZoneInfo
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 import joblib
+import os
 
 # ─── AUTO-REFRESH EVERY SECOND ─────────────────────────
 st_autorefresh(interval=1000, limit=None, key="timer_refresh")
@@ -61,7 +62,7 @@ def fetch_twelve(sym_key):
     return df
 
 # ─── TITLE ─────────────────────────────────────────────
-st.title("🤖 Binary Trading Signal Bot with Machine Learning (5-min Forex)")
+st.title("🤖 Binary Trading Signal Bot with ML (5-min Forex)")
 
 df = fetch_twelve(symbol)
 if df is None:
@@ -73,10 +74,16 @@ features = ["EMA9", "EMA21", "RSI", "MACD", "BB_upper", "BB_lower", "Close", "Op
 X = df[features]
 y = df["Target"]
 
-# ─── TRAIN ML MODEL ────────────────────────────────────
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, shuffle=False)
-model = RandomForestClassifier(n_estimators=100, random_state=42)
-model.fit(X_train, y_train)
+# ─── LOAD OR TRAIN MODEL ───────────────────────────────
+model_path = f"{symbol.replace('/', '')}_rf_model.pkl"
+
+if os.path.exists(model_path):
+    model = joblib.load(model_path)
+else:
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, shuffle=False)
+    model = RandomForestClassifier(n_estimators=100, random_state=42)
+    model.fit(X_train, y_train)
+    joblib.dump(model, model_path)
 
 # ─── PREDICT SIGNALS ───────────────────────────────────
 df["ML_Signal"] = model.predict(X)
